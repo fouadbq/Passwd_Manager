@@ -18,7 +18,7 @@ Install the required packages on your local machine
 pip install -r requirements.txt
 ```
 
-Start the monitor
+Start the password manager
 
 ```bash
 py Passwd_Manager.py --init
