@@ -433,15 +433,11 @@ if __name__ == '__main__':
         if len(argv) == 4:
             if argv[1] == '-n' or argv[1] == '--new':
                 
-                Display_Author()
-
                 authenticate_user()
 
                 Create_New_Password()
 
             else:
-
-                Display_Author()
                 
                 Update_password()
                 pass
@@ -450,9 +446,7 @@ if __name__ == '__main__':
             print('Error : Unsufficient arguments !! ')
 
     elif argv[1] == '-s' or argv[1] == '--show':
-        
-        Display_Author()
-        
+             
         Show_Password()
 
     elif argv[1] == '-d' or argv[1] == '--delete':
