@@ -439,6 +439,8 @@ if __name__ == '__main__':
 
             else:
                 
+                authenticate_user()
+                
                 Update_password()
                 pass
 
@@ -446,10 +448,14 @@ if __name__ == '__main__':
             print('Error : Unsufficient arguments !! ')
 
     elif argv[1] == '-s' or argv[1] == '--show':
+        
+        authenticate_user()
              
         Show_Password()
 
     elif argv[1] == '-d' or argv[1] == '--delete':
+        
+        authenticate_user()
         
         Delete_Password()        
         
