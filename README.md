@@ -56,7 +56,7 @@ py Passwd_Manager.py --delete   < service >
 
 &nbsp;&nbsp;&nbsp;To display the existing accounts/services, run the script with the command 
 ```bash
-py Passwd_Manager.py --ss   
+py Passwd_Manager.py -ss   
 ``` 
 
 &nbsp;&nbsp;&nbsp;To change the password of the password manager, run the script with the command 
