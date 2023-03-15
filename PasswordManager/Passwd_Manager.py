@@ -1,7 +1,7 @@
 import random,   string, hashlib, getpass
 from sys import argv, exit
 from json import dump, load
-from colorama import Fore, Style
+from colorama import Fore, Style , init
 from cryptography.fernet import Fernet
 
 
@@ -51,8 +51,8 @@ def Decrypt_Password_Record():
     with open('DateBase/Passwords_Register.json', 'wb') as file:
         file.write(decrypted_data)
     
-# Initialize the necessary files to store the program data 
-def init():
+# Initializeialize the necessary files to store the program data 
+def Initialize():
     
     UserPassword = getpass.getpass("\n\t>>Please do enter your password   :  ")
 
@@ -72,7 +72,7 @@ def init():
     # Encrypt the password register
     Encrypt_Passwrds_Record()
 
-    print("\nInitialization is done successfully.\n")
+    print("\nInitializeialization is done successfully.\n")
 
 
 def authenticate_user():
@@ -392,7 +392,7 @@ def Display_Help_Page():
             python Passwd_Manager.py [option] [length_of_password] [service_name]
 
             options:
-                -i, --init: Initializes the password manager by creating a file to store the user's password and a file to store password records
+                -i, --Initialize: Initializeializes the password manager by creating a file to store the user's password and a file to store password records
             for different services.
             
                 -n, --new: Creates a new password for the specified service.
@@ -409,7 +409,7 @@ def Display_Help_Page():
                 
             Usage example :
             
-                    >>  py Passwd_Manager.py -init
+                    >>  py Passwd_Manager.py -Initialize
                     
                     >>  py Passwd_Manager.py -n 120 gmail
                     
@@ -420,25 +420,70 @@ def Display_Help_Page():
     """)
 
 
+def Display_Services():
+    
+    Decrypt_Password_Record()
+    
+    with open('DateBase/Passwords_Register.json', 'r') as register_file:
+        passwords_list = list(load(register_file))
+        
+    Encrypt_Passwrds_Record()
+
+    print('\n\n>> Here is the list of services in which you are subscribed :\n')
+
+    
+    for password_record in passwords_list:      
+        
+        print('\n\t-->  ',Fore.GREEN,password_record['Service'],Fore.WHITE, '\t[',Fore.YELLOW,passwords_list.index(password_record)+1,Fore.WHITE ,' ]\n'  )
+        
+    try:
+        option = int(input('To select a service, enter the corresponding number. Press Enter to skip : '))
+    except Exception :
+        print('\n\tError : Unvalid input ! ')
+        
+    
+    if option > 0 and option <= len(passwords_list):
+        
+        print('\t>>  Your password is :  ')
+        print('\t\t',Fore.RED,passwords_list[option-1]['Password'],Style.RESET_ALL)
+        
+    elif option=='':
+        pass
+    
+    else:
+        print('\n\tError : Unvalid input ! ')
+        
+
+
+    
+        
+        
+        
+
+        
+        
+    
 if __name__ == '__main__':
 
-    if argv[1] == '-i' or argv[1] == '--init':
+    if argv[1] == '-i' or argv[1] == '--Initialize':
         
         Display_Author()
         
-        init()
+        Initialize()
 
     elif argv[1] == '-n' or argv[1] == '-u' or argv[1] == '--update' or argv[1] == '--new':
 
         if len(argv) == 4:
             if argv[1] == '-n' or argv[1] == '--new':
                 
+                Display_Author()
+
                 authenticate_user()
 
                 Create_New_Password()
 
             else:
-                
+
                 authenticate_user()
                 
                 Update_password()
@@ -450,14 +495,20 @@ if __name__ == '__main__':
     elif argv[1] == '-s' or argv[1] == '--show':
         
         authenticate_user()
-             
+        
         Show_Password()
 
     elif argv[1] == '-d' or argv[1] == '--delete':
         
         authenticate_user()
         
-        Delete_Password()        
+        Delete_Password()     
+        
+    elif argv[1] == '-ss' or argv[1] == '--show_services':
+        
+        authenticate_user()
+        
+        Display_Services()  
         
     elif argv[1] == '--change_password':
         
