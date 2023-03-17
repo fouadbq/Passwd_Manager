@@ -370,14 +370,14 @@ def Change_User_Password():
     
 
 def Display_Author():
-    print(Fore.GREEN+r"""
-                 _____                     _    _____   _   _                             _
-                |  ___|__  _   _  __ _  __| |  | ____| | | | |      __   __ _  __ _  __ _| |_   _
-                | |_ / _ \| | | |/ _` |/ _` |  |  _|   | | | '_ \ / _` |/ _` |/ _` |/ _` | | | | |
-                |  _| (_) | |_| | (_| | (_| |  | |___  | | | |_) | (_| | (_| | (_| | (_| | | |_| |
-                |_|  \___/ \__,_|\__,_|\__,_|  |_____| |_| |_.__/ \__,_|\__, |\__, |\__,_|_|\__, |
-                                                                           |_|   |_|        |___/
-    """+Style.RESET_ALL)
+    print(Fore.GREEN+'\n\n\t    ____                 _    __            ____ ')
+    print('\t   / __ \____ __________| |  / /___ ___  __/ / /_')
+    print('\t  / /_/ / __ `/ ___/ ___/ | / / __ `/ / / / / __/')
+    print('\t / ____/ /_/ (__  |__  )| |/ / /_/ / /_/ / / /_')
+    print('\t/_/    \__,_/____/____/ |___/\__,_/\__,_/_/\__/')
+    
+    print(Fore.BLUE+'\n\t\t Made by Fouad El-Baqqaly\n\n'+Style.RESET_ALL)
+
 
 
 def Display_Help_Page():
@@ -464,10 +464,10 @@ def Display_Services():
         
     
 if __name__ == '__main__':
+    
+    Display_Author()
 
     if argv[1] == '-i' or argv[1] == '--Initialize':
-        
-        Display_Author()
         
         Initialize()
 
@@ -476,8 +476,6 @@ if __name__ == '__main__':
         if len(argv) == 4:
             if argv[1] == '-n' or argv[1] == '--new':
                 
-                Display_Author()
-
                 authenticate_user()
 
                 Create_New_Password()
