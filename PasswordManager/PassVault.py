@@ -456,16 +456,12 @@ def Display_Services():
 
 
     
-        
-        
-        
-
-        
-        
-    
+           
 if __name__ == '__main__':
     
     Display_Author()
+    
+    authenticate_user()
 
     if argv[1] == '-i' or argv[1] == '--Initialize':
         
@@ -475,14 +471,10 @@ if __name__ == '__main__':
 
         if len(argv) == 4:
             if argv[1] == '-n' or argv[1] == '--new':
-                
-                authenticate_user()
 
                 Create_New_Password()
 
             else:
-
-                authenticate_user()
                 
                 Update_password()
                 pass
@@ -492,19 +484,13 @@ if __name__ == '__main__':
 
     elif argv[1] == '-s' or argv[1] == '--show':
         
-        authenticate_user()
-        
         Show_Password()
 
     elif argv[1] == '-d' or argv[1] == '--delete':
         
-        authenticate_user()
-        
         Delete_Password()     
         
     elif argv[1] == '-ss' or argv[1] == '--show_services':
-        
-        authenticate_user()
         
         Display_Services()  
         
