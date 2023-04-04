@@ -54,6 +54,12 @@ py Passwd_Manager.py --show   < service >
 py Passwd_Manager.py --delete   < service >
 ``` 
 
+&nbsp;&nbsp;&nbsp;To add a customized password by the user while getting an evaluation of this password (the estimated strength), run the script with the command 
+```bash
+py Passwd_Manager.py --add   < customized password >
+``` 
+
+
 &nbsp;&nbsp;&nbsp;To display the existing accounts/services, run the script with the command 
 ```bash
 py Passwd_Manager.py -ss   
