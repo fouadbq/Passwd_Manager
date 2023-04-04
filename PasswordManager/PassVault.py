@@ -1,12 +1,37 @@
-import random,   string, hashlib, getpass
+import hashlib
+
 from sys import argv, exit
+
 from json import dump, load
-from colorama import Fore, Style , init
-from cryptography.fernet import Fernet
+
+from colorama import Fore, Style
+
+from string import digits, ascii_letters, punctuation
+
+from random import choice
+
+from getpass import getpass
+
+from re import search
+
+from os import path, mkdir, urandom
+
+from cryptography.hazmat.primitives.ciphers import Cipher
+
+from cryptography.hazmat.primitives.ciphers.algorithms import AES
+
+from cryptography.hazmat.primitives.ciphers.modes import CBC
+
+from cryptography.hazmat.primitives.padding import PKCS7
+
+from cryptography.hazmat.backends import default_backend
+
+
+PassVault_Root = path.join(path.abspath(path.sep), 'PassVault')
 
 
 def hash(password):
-    #Generate a salt string
+    # Generate a salt string
     salt = """Est un constructeur générique qui prend comme premier paramètre le nom de l'algorithme désiré (name) . Il existe pour permettre l'accès aux algorithmes listés ci-dessus ainsi qu'aux autres algorithmes que votre librairie OpenSSL peut offrir. Les constructeurs nommés sont beaucoup plus rapides que new() et doivent être privilégiés."""
 
     # Instanciating a new SHA-512
@@ -17,70 +42,139 @@ def hash(password):
     return sha512.hexdigest()
 
 
-def Get_Fernet():
-    # Load the secret key from the .key file.
-    with open('DateBase/.key', 'rb') as keyfile :
-        key = keyfile.read()
-    
-    return Fernet(key)
-
-
 def Encrypt_Passwrds_Record():
-    fernet= Get_Fernet()
-    
-    with open('DateBase/Passwords_Register.json', 'rb') as file:        
-        Clrear_Data = file.read()
-        
-    # Encrypt the file data
-    encrypted_data = fernet.encrypt(Clrear_Data)
+
+    # Read the key from the file
+    with open(path.join(PassVault_Root, 'DateBase', '.key'), 'rb') as key_file:
+        key = key_file.read()
+
+    # Generate a random initialization vector
+    init_vect = urandom(16)
+
+    # Create the cipher object with CBC mode and PKCS7 padding
+    cipher = Cipher(AES(key), CBC(init_vect), backend=default_backend())
+    padder = PKCS7(128).padder()
+
+    # Read the contents of the input file and pad it
+    with open(path.join(PassVault_Root, 'DateBase', 'Passwords_Register.json'), 'rb') as Passwords_Register:
+        padded_data = padder.update(
+            Passwords_Register.read()) + padder.finalize()
+
+    # Encrypt the padded data
+    encryptor = cipher.encryptor()
+    Encrypted_Passwords = encryptor.update(padded_data) + encryptor.finalize()
+
+    # Write the encrypted data to a new file
+    with open(path.join(PassVault_Root, 'DateBase', 'Passwords_Register.json'), 'wb') as Passwords_Register:
+        Passwords_Register.write(init_vect + Encrypted_Passwords)
 
 
-    with open('DateBase/Passwords_Register.json', 'wb') as file:
-        file.write(encrypted_data)
-        
-        
 def Decrypt_Password_Record():
-    fernet= Get_Fernet()
+    # Read the key from the file
+    with open(path.join(PassVault_Root, 'DateBase', '.key'), 'rb') as key_file:
+        key = key_file.read()
 
-    with open('DateBase/Passwords_Register.json', 'rb') as file:
-        encrypted_data = file.read()
-        
-    # Decrypt the file data
-    decrypted_data = fernet.decrypt(encrypted_data)
-        
-    with open('DateBase/Passwords_Register.json', 'wb') as file:
-        file.write(decrypted_data)
-    
-# Initializeialize the necessary files to store the program data 
+    # Read the initialization vector and encrypted data from the input file
+    with open(path.join(PassVault_Root, 'DateBase', 'Passwords_Register.json'), 'rb') as Passwords_Register:
+        init_vect = Passwords_Register.read(16)
+        Encrypted_Passwords = Passwords_Register.read()
+
+    # Create the cipher object with CBC mode and PKCS7 padding
+    cipher = Cipher(AES(key), CBC(init_vect), backend=default_backend())
+    unpadder = PKCS7(128).unpadder()
+
+    # Decrypt the encrypted data
+    decryptor = cipher.decryptor()
+    Decrypted_Passwords = decryptor.update(
+        Encrypted_Passwords) + decryptor.finalize()
+
+    # Unpad the decrypted data
+    Passwords_List = unpadder.update(Decrypted_Passwords) + unpadder.finalize()
+
+    # Write the decrypted data to a new file
+    with open(path.join(PassVault_Root, 'DateBase', 'Passwords_Register.json'), 'wb') as Passwords_Register:
+        Passwords_Register.write(Passwords_List)
+
+
+# Initializeialize the necessary files to store the program data
 def Initialize():
-    
-    UserPassword = getpass.getpass("\n\t>>Please do enter your password   :  ")
 
-    #Store the user authentication password
-    with open('DateBase/UserPassword.hash', 'w') as user_password_file:
-        user_password_file.write(hash(UserPassword))
+    if not path.exists(PassVault_Root):
 
-    # Create  a passwords register file
-    with open('DateBase/Passwords_Register.json', 'w') as password_register:
-        dump([], password_register, indent=4)
-        
-    # Generate a secret key and save it to a hidden file.
-    key = Fernet.generate_key()
-    with open('DateBase/.key', 'wb') as key_file:
-        key_file.write(key)
-        
-    # Encrypt the password register
-    Encrypt_Passwrds_Record()
+        mkdir(PassVault_Root)
+        mkdir(path.join(PassVault_Root, 'DateBase'))
 
-    print("\nInitializeialization is done successfully.\n")
+        UserPassword = getpass(
+            "\n\t>>Please do enter your authentification password   :  ")
+
+        # Store the user authentication password
+        with open(path.join(PassVault_Root, 'DateBase', 'UserPassword.hash'), 'w') as user_password_file:
+            user_password_file.write(hash(UserPassword))
+
+        # Create  a passwords register file
+        with open(path.join(PassVault_Root, 'DateBase', 'Passwords_Register.json'), 'w') as password_register:
+            dump([], password_register, indent=4)
+
+        # Generate a 32 bytes <=> 256-bit enc key && storing it in a hidden file
+        with open(path.join(PassVault_Root, 'DateBase', '.key'), 'wb') as key_file:
+            key_file.write(urandom(32))
+
+        Encrypt_Passwrds_Record()
+
+        print("\nInitialization is done successfully.\n")
+    else:
+        print('The initialization phaze already took place, do you want to update the whole files ? ')
+        print('Note : this would lead to the deletion of your passwords')
+
+        option = input('Update < u > | Overwrite < w > | Cancel < c > :\t')
+
+        if option == 'u' or option == 'w':
+
+            NewUserPassword = getpass(
+                "\n\t>>Please do enter your new authentification password   :  ")
+
+            with open(path.join(PassVault_Root, 'DateBase', 'UserPassword.hash'), 'w') as user__password__file:
+                user__password__file.write(hash(NewUserPassword))
+
+            if option == 'u':
+
+                Decrypt_Password_Record()
+
+                with open(path.join(PassVault_Root, 'DateBase', 'Passwords_Register.json'), 'r') as Passwords_List_File:
+                    Passwords_List = load(Passwords_List_File)
+
+                # Regenerate a new 32 bytes <=> 256-bit enc key && storing it in a hidden file
+                with open(path.join(PassVault_Root, 'DateBase', '.key'), 'wb') as key_file:
+                    key_file.write(urandom(32))
+
+                with open(path.join(PassVault_Root, 'DateBase', 'Passwords_Register.json'), 'w') as Passwords_Register:
+                    dump(Passwords_List, Passwords_Register, indent=4)
+
+                Encrypt_Passwrds_Record()
+
+            elif option == 'w':
+
+                with open(path.join(PassVault_Root, 'DateBase', 'Passwords_Register.json'), 'w') as Passwords__Register:
+                    dump([], Passwords__Register, indent=4)
+
+                Encrypt_Passwrds_Record()
+
+                # Regenerate a new 32 bytes <=> 256-bit enc key && storing it in a hidden file
+                with open(path.join(PassVault_Root, 'DateBase', '.key'), 'wb') as key_file:
+                    key_file.write(urandom(32))
+
+        elif option == 'c':
+            exit()
+        else:
+            print('Unvalid input !')
 
 
 def authenticate_user():
     for i in range(3):
 
-        Password = getpass.getpass("\n\t>>Please do enter your password   :  ")
+        Password = getpass("\n\t>>Please do enter your password   :  ")
 
-        with open('DateBase/UserPassword.hash', 'r') as user_password_file:
+        with open(path.join(PassVault_Root, 'DateBase', 'UserPassword.hash'), 'r') as user_password_file:
             stored_password_hash = user_password_file.read()
 
         if stored_password_hash == hash(Password):
@@ -95,21 +189,22 @@ def authenticate_user():
 
 
 def generate_new_password(len):
-    
-    # Create a dictionay 
-    Dictionary = string.ascii_letters + string.digits + string.punctuation.replace('"', '').replace("'", '').replace('\\', '')
-        
+
+    # Create a dictionay
+    Dictionary = ascii_letters + digits + \
+        punctuation.replace('"', '').replace("'", '').replace('\\', '')
+
     Decrypt_Password_Record()
 
     passwords_list = []
-    with open('DateBase/Passwords_Register.json', 'r') as register_file:
+    with open(path.join(PassVault_Root, 'DateBase', 'Passwords_Register.json'), 'r') as register_file:
         passwords_list = load(register_file)
-        
+
     Encrypt_Passwrds_Record()
-    
+
     # Check if the password already exists in the password register => Password duplication is not allowed
     while True:
-        New_Password = ''.join(random.choice(Dictionary) for i in range(len))
+        New_Password = ''.join(choice(Dictionary) for i in range(len))
 
         if not any(New_Password == psswd_record['Password'] for psswd_record in passwords_list):
             break
@@ -118,12 +213,12 @@ def generate_new_password(len):
 
 
 def Service_Exists(service):
-    
+
     Decrypt_Password_Record()
-    
-    with open('DateBase/Passwords_Register.json', 'r') as register_file:
+
+    with open(path.join(PassVault_Root, 'DateBase', 'Passwords_Register.json'), 'r') as register_file:
         passwords_list = load(register_file)
-        
+
     Encrypt_Passwrds_Record()
 
     return any(service == psswd_record['Service'] for psswd_record in passwords_list)
@@ -131,12 +226,12 @@ def Service_Exists(service):
 
 # Retreive the password from the password register
 def Get_Password(service):
-    
+
     Decrypt_Password_Record()
-    
-    with open('DateBase/Passwords_Register.json', 'r') as register_file:
+
+    with open(path.join(PassVault_Root, 'DateBase', 'Passwords_Register.json'), 'r') as register_file:
         passwords_list = load(register_file)
-        
+
     Encrypt_Passwrds_Record()
 
     for password_record in passwords_list:
@@ -147,7 +242,7 @@ def Get_Password(service):
 
 
 def Create_New_Password():
-    
+
     # Check if a password already exists for the given service
     if not Service_Exists(argv[3]):
 
@@ -159,19 +254,19 @@ def Create_New_Password():
         }
 
         Password_Record_data = []
-        
+
         Decrypt_Password_Record()
-        
-        with open('DateBase/Passwords_Register.json', 'r') as Passwords_Register:
+
+        with open(path.join(PassVault_Root, 'DateBase', 'Passwords_Register.json'), 'r') as Passwords_Register:
             Password_Record_data = load(Passwords_Register)
 
         # Add the new password record to the register
         Password_Record_data.append(Password_Record)
 
-        with open('DateBase/Passwords_Register.json', 'w') as Passwords_Register:
+        with open(path.join(PassVault_Root, 'DateBase', 'Passwords_Register.json'), 'w') as Passwords_Register:
 
             dump(Password_Record_data, Passwords_Register, indent=4)
-            
+
         Encrypt_Passwrds_Record()
 
         print('\nHere is the genarated password for ' +
@@ -180,7 +275,8 @@ def Create_New_Password():
     # In case a password already exists for the service
     else:
         print('You already do have a password for this service !! ')
-        option = input('Press :   <'+Fore.YELLOW+' s '+Style.RESET_ALL + '> To see the password  | <'+Fore.YELLOW+' c '+Style.RESET_ALL+'>  To cancel   ')
+        option = input('Press :   <'+Fore.YELLOW+' s '+Style.RESET_ALL +
+                       '> To see the password  | <'+Fore.YELLOW+' c '+Style.RESET_ALL+'>  To cancel   ')
 
         if option == 's':
 
@@ -194,11 +290,12 @@ def Create_New_Password():
 
 
 def Update_password():
-    
+
     # Check fisrt if a password already exists for the given service
     if Service_Exists(argv[3]):
 
-        choice = input('\nPress :   <'+Fore.YELLOW+' y '+Style.RESET_ALL +'> to confirm password update  | <'+Fore.YELLOW+' n '+Style.RESET_ALL+'>  to cancel   ')
+        choice = input('\nPress :   <'+Fore.YELLOW+' y '+Style.RESET_ALL +
+                       '> to confirm password update  | <'+Fore.YELLOW+' n '+Style.RESET_ALL+'>  to cancel   ')
 
         if choice == 'y':
 
@@ -210,23 +307,23 @@ def Update_password():
             }
 
             Decrypt_Password_Record()
-            
+
             Password_Record_data = []
-            with open('DateBase/Passwords_Register.json', 'r') as Passwords_Register:
+            with open(path.join(PassVault_Root, 'DateBase', 'Passwords_Register.json'), 'r') as Passwords_Register:
                 Password_Record_data = load(Passwords_Register)
 
             # Fister the password register to eliminate the old password
-            Updated_Password_Record_data = [record for record in Password_Record_data if record['Service'] != argv[3]]
+            Updated_Password_Record_data = [
+                record for record in Password_Record_data if record['Service'] != argv[3]]
 
-            # Add the new password record to the file 
+            # Add the new password record to the file
             Updated_Password_Record_data.append(Updated_Password_Record)
 
-            with open('DateBase/Passwords_Register.json', 'w') as Passwords_Register:
-                dump(Updated_Password_Record_data,Passwords_Register, indent=4)
-                
-                
+            with open(path.join(PassVault_Root, 'DateBase', 'Passwords_Register.json'), 'w') as Passwords_Register:
+                dump(Updated_Password_Record_data,
+                     Passwords_Register, indent=4)
+
             Encrypt_Passwrds_Record()
-            
 
             print('\nYour password has been updated successfully\n')
             print('Your updated password for  '+Fore.GREEN +
@@ -240,7 +337,8 @@ def Update_password():
     # In case the user does not posess a password for this provided service >> allow the creation of one
     else:
         print('\n\tYou do not have a password for the spesified service !! \n')
-        option = input('Press :   <'+Fore.YELLOW+' y '+Style.RESET_ALL +'> to create a password  | <'+Fore.YELLOW+' n '+Style.RESET_ALL+'>  to cancel   ')
+        option = input('Press :   <'+Fore.YELLOW+' y '+Style.RESET_ALL +
+                       '> to create a password  | <'+Fore.YELLOW+' n '+Style.RESET_ALL+'>  to cancel   ')
 
         if option == 'y':
 
@@ -256,93 +354,94 @@ def Update_password():
 
 
 def Create_New_Password_V2():
-    
+
     print('\n\tYou do not have a password for the spesified service !! \n')
-    option = input('Press :   <'+Fore.YELLOW+' y '+Style.RESET_ALL +'> to create a password  | <'+Fore.YELLOW+' n '+Style.RESET_ALL+'>  to cancel   ')
+    option = input('Press :   <'+Fore.YELLOW+' y '+Style.RESET_ALL +
+                   '> to create a password  | <'+Fore.YELLOW+' n '+Style.RESET_ALL+'>  to cancel   ')
 
     if option == 'y':
-    
+
         len = int(input('Enter the length of the password  :  '))
-        
-        
+
         New_Password = generate_new_password(len)
 
         Password_Record = {
             'Service': argv[2],
             'Password': New_Password
         }
-        
-        
+
         Decrypt_Password_Record()
 
         Password_Record_data = []
-        with open('DateBase/Passwords_Register.json', 'r') as Passwords_Register:
-            
+        with open(path.join(PassVault_Root, 'DateBase', 'Passwords_Register.json'), 'r') as Passwords_Register:
+
             Password_Record_data = load(Passwords_Register)
 
         Password_Record_data.append(Password_Record)
 
-        with open('DateBase/Passwords_Register.json', 'w') as Passwords_Register:
+        with open(path.join(PassVault_Root, 'DateBase', 'Passwords_Register.json'), 'w') as Passwords_Register:
 
             dump(Password_Record_data, Passwords_Register, indent=4)
-            
+
         Encrypt_Passwrds_Record()
 
-        print('\nHere is the genarated password for '+   argv[2]+'  is : \n\t'+Fore.RED+New_Password+Style.RESET_ALL+'\n')
-    
+        print('\nHere is the genarated password for ' +
+              argv[2]+'  is : \n\t'+Fore.RED+New_Password+Style.RESET_ALL+'\n')
+
     elif option == 'n':
 
-            exit()
+        exit()
 
     else:
-            print(Fore.RED+'\nError : Unvalid input'+Style.RESET_ALL)
-                    
-    
+        print(Fore.RED+'\nError : Unvalid input'+Style.RESET_ALL)
+
+
 def Show_Password():
 
     if Service_Exists(argv[2]):
-        
-        print('\nHere is your password for ' +argv[2]+' : \n\n\t'+Fore.RED + Get_Password(argv[2]) + Style.RESET_ALL+'\n')
-        
+
+        print('\nHere is your password for ' +
+              argv[2]+' : \n\n\t'+Fore.RED + Get_Password(argv[2]) + Style.RESET_ALL+'\n')
+
     else:
         Create_New_Password_V2()
 
 
 def Delete_Password():
-    
+
     # Check fisrt if a password for the provided service exists
     if Service_Exists(argv[2]):
-        
-        Decrypt_Password_Record()        
-        
+
+        Decrypt_Password_Record()
+
         Password_Record_data = []
-        with open('DateBase/Passwords_Register.json', 'r') as Passwords_Register:
+        with open(path.join(PassVault_Root, 'DateBase', 'Passwords_Register.json'), 'r') as Passwords_Register:
             Password_Record_data = load(Passwords_Register)
 
-        Updated_Password_Record_data = [record for record in Password_Record_data if record['Service'] != argv[2]]
+        Updated_Password_Record_data = [
+            record for record in Password_Record_data if record['Service'] != argv[2]]
 
+        with open(path.join(PassVault_Root, 'DateBase', 'Passwords_Register.json'), 'w') as Passwords_Register:
+            dump(Updated_Password_Record_data, Passwords_Register, indent=4)
 
-        with open('DateBase/Passwords_Register.json', 'w') as Passwords_Register:
-            dump(Updated_Password_Record_data,Passwords_Register, indent=4)
-            
         Encrypt_Passwrds_Record()
 
         print('\nThe password has been deleted successfully\n')
-    
-    #If not allow the user to create new one    
+
+    # If not allow the user to create new one
     else:
-        
+
         Create_New_Password_V2()
 
 
-def Change_User_Password():   
-    
+def Change_User_Password():
+
     # Authenticate the user
     for i in range(3):
 
-        OldPassword = getpass.getpass("\n\t>>Please do enter your old password   :  ")
+        OldPassword = getpass("\n\t>>Please do enter your old password   :  ")
 
-        with open('DateBase/UserPassword.hash', 'r') as user_password_file:
+        with open(path.join(PassVault_Root, 'DateBase', 'UserPassword.hash'), 'r') as user_password_file:
             stored_password_hash = user_password_file.read()
 
         if stored_password_hash == hash(OldPassword):
@@ -354,20 +453,18 @@ def Change_User_Password():
 
         if i == 2:
             exit()
-    
+
     # Retreive the new password
-    NewPassword = getpass.getpass("\n\t>>Please do enter a new password   :  ")
-    
-    
-    with open('DateBase/UserPassword.hash', 'w') as user_password_file:
+    NewPassword = getpass("\n\t>>Please do enter a new password   :  ")
+
+    with open(path.join(PassVault_Root, 'DateBase', 'UserPassword.hash'), 'w') as user_password_file:
         user_password_file.write(hash(NewPassword))
 
-    with open('DateBase/UserPassword.hash', 'w') as user_password_file:
+    with open(path.join(PassVault_Root, 'DateBase', 'UserPassword.hash'), 'w') as user_password_file:
         user_password_file.write(hash(NewPassword))
-
 
     print("\nYour password has been updated successfully.\n")
-    
+
 
 def Display_Author():
     print(Fore.GREEN+'\n\n\t    ____                 _    __            ____ ')
@@ -375,9 +472,8 @@ def Display_Author():
     print('\t  / /_/ / __ `/ ___/ ___/ | / / __ `/ / / / / __/')
     print('\t / ____/ /_/ (__  |__  )| |/ / /_/ / /_/ / / /_')
     print('\t/_/    \__,_/____/____/ |___/\__,_/\__,_/_/\__/')
-    
-    print(Fore.BLUE+'\n\t\t Made by Fouad El-Baqqaly\n\n'+Style.RESET_ALL)
 
+    print(Fore.BLUE+'\n\t\t Made by Fouad El-Baqqaly\n\n'+Style.RESET_ALL)
 
 
 def Display_Help_Page():
@@ -392,24 +488,26 @@ def Display_Help_Page():
             python Passwd_Manager.py [option] [length_of_password] [service_name]
 
             options:
-                -i, --Initialize: Initializeializes the password manager by creating a file to store the user's password and a file to store password records
+                -i, --init: Initializeializes the password manager by creating a file to store the user's password and a file to store password records
             for different services.
             
-                -n, --new: Creates a new password for the specified service.
+                -n, --new          : Creates a new password for the specified service.
                 
-                -u, --update: Updates an existing password for the specified service.
+                -u, --update       : Updates an existing password for the specified service.
                 
-                -s, --show: Retrieves the password for the specified service.
+                -s, --show         : Retrieves the password for the specified service.
                 
-                -d, --delete: Deletes the password of the specified service.
+                -d, --delete       : Deletes the password of the specified service.
                 
-                --change_password : Allows the user to change its password of the PasswordManager program.
+                -a, --add          : Allows adding a user customized password.
                 
-                -h, --help: Displays this help page.
+                --change_password  : Allows the user to change its password of the PasswordManager program.
+                
+                -h, --help         : Displays this help page.
                 
             Usage example :
             
-                    >>  py Passwd_Manager.py -Initialize
+                    >>  py Passwd_Manager.py -Init
                     
                     >>  py Passwd_Manager.py -n 120 gmail
                     
@@ -421,50 +519,104 @@ def Display_Help_Page():
 
 
 def Display_Services():
-    
+
     Decrypt_Password_Record()
-    
-    with open('DateBase/Passwords_Register.json', 'r') as register_file:
+
+    with open(path.join(PassVault_Root, 'DateBase', 'Passwords_Register.json'), 'r') as register_file:
         passwords_list = list(load(register_file))
-        
+
     Encrypt_Passwrds_Record()
 
     print('\n\n>> Here is the list of services in which you are subscribed :\n')
 
-    
-    for password_record in passwords_list:      
-        
-        print('\n\t-->  ',Fore.GREEN,password_record['Service'],Fore.WHITE, '\t[',Fore.YELLOW,passwords_list.index(password_record)+1,Fore.WHITE ,' ]\n'  )
-        
+    for password_record in passwords_list:
+
+        print('\n\t-->  ', Fore.GREEN, password_record['Service'], Fore.WHITE, '\t[',
+              Fore.YELLOW, passwords_list.index(password_record)+1, Fore.WHITE, ' ]\n')
+
     try:
-        option = int(input('To select a service, enter the corresponding number. Press Enter to skip : '))
-    except Exception :
+        option = int(input(
+            'To select a service, enter the corresponding number. Press Enter to skip : '))
+    except Exception:
         print('\n\tError : Unvalid input ! ')
-        
-    
+
     if option > 0 and option <= len(passwords_list):
-        
+
         print('\t>>  Your password is :  ')
-        print('\t\t',Fore.RED,passwords_list[option-1]['Password'],Style.RESET_ALL)
-        
-    elif option=='':
+        print('\t\t', Fore.RED,
+              passwords_list[option-1]['Password'], Style.RESET_ALL)
+
+    elif option == '':
         pass
-    
+
     else:
         print('\n\tError : Unvalid input ! ')
-        
 
 
-    
-           
+def Add_User_Customized_Password(password):
+
+    strength = 100
+
+    print('Your password < {} >  is : '.format(password))
+
+    if len(password) <= 50:
+        print('\t\t-> is not long enough')
+        strength -= 10
+
+    if not bool(search(r'[A-Z]', password)):
+        print('\t-> does not contain any capital letters')
+        strength -= 10
+
+    if not bool(search(r'\d', password)):
+        print('\t-> does not contain any numbers')
+        strength -= 40
+
+    if not bool(search(r'[^\w\s]', password)):
+        print('\t-> does not contain any symbols')
+        strength -= 40
+
+    print('\nYour password strength is about {}/100\n'.format(strength))
+
+    option = input(
+        'Are you sure that you want to add this password to your PassVault  ?  yes : < y > | no : < n >\t')
+
+    if option == 'y':
+        service = input('Please enter the service name  :\t')
+
+        Password_Record = {
+            'Service': service,
+            'Password': password
+        }
+
+        Password_Record_data = []
+
+        Decrypt_Password_Record()
+
+        with open(path.join(PassVault_Root, 'DateBase', 'Passwords_Register.json'), 'r') as Passwords_Register:
+            Password_Record_data = load(Passwords_Register)
+
+        # Add the new password record to the register
+        Password_Record_data.append(Password_Record)
+
+        with open(path.join(PassVault_Root, 'DateBase', 'Passwords_Register.json'), 'w') as Passwords_Register:
+
+            dump(Password_Record_data, Passwords_Register, indent=4)
+
+        Encrypt_Passwrds_Record()
+
+        print(f'Your password for the {service}  service is  {password}\n\n')
+
+    exit()
+
+
 if __name__ == '__main__':
-    
-    Display_Author()
-    
-    authenticate_user()
 
-    if argv[1] == '-i' or argv[1] == '--Initialize':
-        
+    Display_Author()
+
+    # authenticate_user()
+
+    if argv[1] == '-i' or argv[1] == '--init':
+
         Initialize()
 
     elif argv[1] == '-n' or argv[1] == '-u' or argv[1] == '--update' or argv[1] == '--new':
@@ -475,7 +627,7 @@ if __name__ == '__main__':
                 Create_New_Password()
 
             else:
-                
+
                 Update_password()
                 pass
 
@@ -483,25 +635,29 @@ if __name__ == '__main__':
             print('Error : Unsufficient arguments !! ')
 
     elif argv[1] == '-s' or argv[1] == '--show':
-        
+
         Show_Password()
 
     elif argv[1] == '-d' or argv[1] == '--delete':
-        
-        Delete_Password()     
-        
+
+        Delete_Password()
+
     elif argv[1] == '-ss' or argv[1] == '--show_services':
-        
-        Display_Services()  
-        
+
+        Display_Services()
+
+    elif argv[1] == '-a' or argv[1] == '--add':
+
+        Add_User_Customized_Password(argv[2])
+
     elif argv[1] == '--change_password':
-        
+
         Change_User_Password()
-        
+
     elif argv[1] == '-h' or argv[1] == '--help':
-        
+
         Display_Help_Page()
-        
+
     else:
         print('Error : Unvalid arguments !! ')
         print('Check the help page  : py Passwd_Manager.py -h ')
